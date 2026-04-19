@@ -33,13 +33,15 @@ projects/
   decision-engine-infra/
 ```
 
-The Compose file bind-mounts `../decision-engine-api` into the `api` and `worker` containers, and `../decision-engine-web` into the `web` container.
+The Compose file builds `../decision-engine-api` into the `api` and `worker` images for faster local API response times on Windows. It bind-mounts `../decision-engine-web` into the `web` container for Vite hot reload.
 
 Copy the shared env file first:
 
 ```bash
 cp .env.example .env
 ```
+
+Keep `MERCURE_JWT_SECRET` at least 32 bytes long. Short placeholders such as `change-me` make Symfony's JWT signer reject publishes, which means votes recompute in the API but live result events never reach the browser.
 
 Start the full stack:
 
@@ -57,7 +59,15 @@ Local entrypoints:
 
 These URLs use the committed `.env.example` defaults. If your local `.env` changes `WEB_PORT`, `API_PORT`, or `MERCURE_PORT`, use those host ports instead.
 
-The API container installs Composer dependencies if needed, waits for PostgreSQL, runs migrations, and serves Symfony on port `8000`. The worker installs dependencies if needed and consumes the `async` Messenger transport.
+The API image installs Composer dependencies at build time. At runtime, the API waits for PostgreSQL, runs migrations, clears the Symfony cache, and serves Symfony on port `8000` with multiple PHP CLI server workers. The worker consumes the `async` Messenger transport.
+
+After changing API PHP code, rebuild the API and worker images:
+
+```bash
+docker compose up -d --build api worker
+```
+
+The stack defaults the API and worker to `APP_ENV=prod` with `APP_DEBUG=0` for fast local page switching on Windows bind mounts. Override `APP_ENV=dev` in `.env` only when you need Symfony debug diagnostics.
 
 The web container runs Vite in dev mode on port `5173` and proxies `/api` requests to the `api` service inside Compose.
 

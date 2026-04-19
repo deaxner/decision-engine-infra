@@ -26,3 +26,9 @@ COPY docker/api/start-worker.sh /usr/local/bin/start-worker
 RUN chmod +x /usr/local/bin/start-api /usr/local/bin/start-worker
 
 WORKDIR /app
+
+COPY --from=api-src composer.json composer.lock ./
+RUN composer install --no-interaction --prefer-dist --optimize-autoloader
+
+COPY --from=api-src . ./
+RUN composer dump-autoload --optimize

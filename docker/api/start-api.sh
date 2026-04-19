@@ -16,4 +16,6 @@ until pg_isready -h postgres -p 5432 -U "${POSTGRES_USER}" -d "${POSTGRES_DB}" >
 done
 
 php bin/console doctrine:migrations:migrate --no-interaction
+php bin/console cache:clear --no-warmup
+export PHP_CLI_SERVER_WORKERS="${PHP_CLI_SERVER_WORKERS:-4}"
 exec php -S 0.0.0.0:8000 -t public public/index.php
