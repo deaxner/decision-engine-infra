@@ -2,30 +2,116 @@ services:
   postgres:
     image: postgres:16
     environment:
-      POSTGRES_DB: decision_engine
-      POSTGRES_USER: decision_engine
-      POSTGRES_PASSWORD: decision_engine
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     ports:
-      - "5432:5432"
+      - "${POSTGRES_PORT}:5432"
     volumes:
       - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
 
   redis:
     image: redis:7
     ports:
-      - "6379:6379"
+      - "${REDIS_PORT}:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
 
   mercure:
     image: dunglas/mercure
     environment:
       SERVER_NAME: ":80"
-      MERCURE_PUBLISHER_JWT_KEY: change-me
-      MERCURE_SUBSCRIBER_JWT_KEY: change-me
+      MERCURE_PUBLISHER_JWT_KEY: ${MERCURE_JWT_SECRET}
+      MERCURE_SUBSCRIBER_JWT_KEY: ${MERCURE_JWT_SECRET}
       MERCURE_EXTRA_DIRECTIVES: |
         cors_origins *
     ports:
-      - "3001:80"
+      - "${MERCURE_PORT}:80"
+
+  api:
+    build:
+      context: .
+      dockerfile: docker/api/Dockerfile
+    working_dir: /app
+    command: ["/usr/local/bin/start-api"]
+    environment:
+      APP_ENV: dev
+      APP_SECRET: ${APP_SECRET}
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}?serverVersion=16&charset=utf8
+      MESSENGER_TRANSPORT_DSN: redis://redis:6379/messages
+      MERCURE_URL: http://mercure/.well-known/mercure
+      MERCURE_PUBLIC_URL: http://127.0.0.1:${MERCURE_PORT}/.well-known/mercure
+      MERCURE_JWT_SECRET: ${MERCURE_JWT_SECRET}
+      COMPOSER_ALLOW_SUPERUSER: 1
+    ports:
+      - "${API_PORT}:8000"
+    volumes:
+      - ../decision-engine-api:/app
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      mercure:
+        condition: service_started
+
+  worker:
+    build:
+      context: .
+      dockerfile: docker/api/Dockerfile
+    working_dir: /app
+    command: ["/usr/local/bin/start-worker"]
+    environment:
+      APP_ENV: dev
+      APP_SECRET: ${APP_SECRET}
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}?serverVersion=16&charset=utf8
+      MESSENGER_TRANSPORT_DSN: redis://redis:6379/messages
+      MERCURE_URL: http://mercure/.well-known/mercure
+      MERCURE_PUBLIC_URL: http://127.0.0.1:${MERCURE_PORT}/.well-known/mercure
+      MERCURE_JWT_SECRET: ${MERCURE_JWT_SECRET}
+      COMPOSER_ALLOW_SUPERUSER: 1
+    volumes:
+      - ../decision-engine-api:/app
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      mercure:
+        condition: service_started
+
+  web:
+    build:
+      context: .
+      dockerfile: docker/web/Dockerfile
+    working_dir: /app
+    command: ["/usr/local/bin/start-web"]
+    environment:
+      VITE_API_BASE_URL: /api
+      VITE_API_PROXY_TARGET: http://api:8000
+      VITE_MERCURE_URL: http://127.0.0.1:${MERCURE_PORT}/.well-known/mercure
+    ports:
+      - "${WEB_PORT}:5173"
+    volumes:
+      - ../decision-engine-web:/app
+      - /app/node_modules
+    depends_on:
+      api:
+        condition: service_started
 
 volumes:
   postgres-data:
-
