@@ -2,6 +2,13 @@
 
 Infrastructure and operational wiring for the real-time decision platform.
 
+## License Status
+
+This repository is source-available for viewing and evaluation only.
+All rights are reserved by the author. No permission is granted to use,
+modify, redistribute, or commercialize this code without prior written
+permission. See [LICENSE](LICENSE).
+
 This repository owns local and deployment configuration that crosses application boundaries.
 
 ## Responsibilities
