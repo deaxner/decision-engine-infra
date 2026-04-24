@@ -75,6 +75,7 @@ services:
       dockerfile: docker/api/Dockerfile
       additional_contexts:
         api-src: ../decision-engine-api
+    restart: unless-stopped
     working_dir: /app
     command: ["/usr/local/bin/start-worker"]
     environment:
